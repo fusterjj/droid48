@@ -44,6 +44,7 @@ public class HPView extends SurfaceView implements SurfaceHolder.Callback, Runna
 	private SurfaceHolder mSurfaceHolder;
 	private boolean surfaceValid;
 	private Bitmap  annImages [];
+    private Bitmap  menuIcon;
 	boolean ann [];
 	int ann_pos [] = { 62, 105, 152, 197, 244, 287 };
 	private List<Integer> queuedCodes;
@@ -52,7 +53,6 @@ public class HPView extends SurfaceView implements SurfaceHolder.Callback, Runna
 	private short buf [];
 	private short audiobuf [];
 	int currentOrientation;
-	private boolean multiTouch;
 	private AudioTrack track;
 	private TimerTask audioTask;
 	private Timer audioTimer;
@@ -65,12 +65,18 @@ public class HPView extends SurfaceView implements SurfaceHolder.Callback, Runna
 	int hidemenu_button [];
 	int buttons_coords [][] = new int [MAX_TOUCHES][4];
     int icons_coords [][] = new int [6][2];
+    int lcd_pos_x ;
+    int lcd_pos_y ;
+    int lcd_pos_x_end ;
+    int lcd_pos_y_end ;
+    int lcd_menuicon_x;
    
     Matrix keyMatrix [] = null;
-	
+
 	Matrix matrixScreen;
     Matrix matrixBack;
     Paint paint;
+    Paint topBarPaint;
     Paint screenPaint = null;
     
     Paint asanaHeadGreenPaint;
@@ -90,7 +96,7 @@ public class HPView extends SurfaceView implements SurfaceHolder.Callback, Runna
     int systemOptions_x;
     int systemOptions_y;
     boolean systemOptionDisplayed = true;
-    
+
     Paint buttonBorderPaint = new Paint();
     
     String topLefts [] = new String [MAX_TOUCHES];
@@ -103,7 +109,6 @@ public class HPView extends SurfaceView implements SurfaceHolder.Callback, Runna
 		setFocusable(true);
 		setFocusableInTouchMode(true);
 		x48 = ((X48) context);
-		multiTouch = Wrapper.supportsMultitouch(x48);
 		mSurfaceHolder = getHolder();
 		mSurfaceHolder.addCallback(this);
 		mainScreen = Bitmap.createBitmap(262, 14+128, Bitmap.Config.RGB_565);
@@ -122,6 +127,7 @@ public class HPView extends SurfaceView implements SurfaceHolder.Callback, Runna
 		annImages [3] = BitmapFactory.decodeResource(x48.getResources(), R.drawable.ann04);
 		annImages [4] = BitmapFactory.decodeResource(x48.getResources(), R.drawable.ann05);
 		annImages [5] = BitmapFactory.decodeResource(x48.getResources(), R.drawable.ann06);
+        menuIcon = BitmapFactory.decodeResource(x48.getResources(), R.drawable.ic_action_core_overflow);
 		
 		dm = x48.getResources().getDisplayMetrics();
 		
@@ -134,7 +140,11 @@ public class HPView extends SurfaceView implements SurfaceHolder.Callback, Runna
 		
 		paint = new Paint(); 
 		paint.setStyle(Style.FILL); 
-		paint.setARGB(128, 250, 250, 250); 
+		paint.setARGB(128, 250, 250, 250);
+
+        topBarPaint = new Paint();
+        topBarPaint.setStyle(Style.FILL);
+        topBarPaint.setARGB(128, 160, 160, 160);
 
 		screenPaint = null;
 		screenPaint = new Paint();
@@ -585,10 +595,10 @@ public class HPView extends SurfaceView implements SurfaceHolder.Callback, Runna
 								usable_w = ((float)w) * 5f / 9f;
 								remaning_w = w - usable_w;
 							}
-							int lcd_pos_x = land?(((int)usable_w-start_w)/2):((w - start_w)/2);
-							int lcd_pos_y = 0;
-							int lcd_pos_x_end = lcd_pos_x+start_w;
-							int lcd_pos_y_end = lcd_pos_y+start_h;
+							lcd_pos_x = land?(((int)usable_w-start_w)/2):((w - start_w)/2);
+							lcd_pos_y = 0;
+							lcd_pos_x_end = lcd_pos_x+start_w;
+							lcd_pos_y_end = lcd_pos_y+start_h;
 							float regular_key_height = usable_h / (8f + 11f/18f);
 							float regular_key_height_right = h / 7f;
 							float menu_key_height = regular_key_height*11/18;
@@ -900,7 +910,9 @@ public class HPView extends SurfaceView implements SurfaceHolder.Callback, Runna
 									backCanvas.drawBitmap(keys[k], keyMatrix[k], keyPaint);
 								}
 							}
-	            		}
+
+                            lcd_menuicon_x = lcd_pos_x_end - menuIcon.getWidth();
+                        }
 	            		
 	            		c.drawBitmap(backBuffer, 0, 0, null);
 	            		if (data != null)
@@ -916,12 +928,9 @@ public class HPView extends SurfaceView implements SurfaceHolder.Callback, Runna
 							if (ann[i])
 								c.drawBitmap(annImages[i], icons_coords[i][0], icons_coords[i][1], null);
 						}
-						
-						
-						if (systemOptionDisplayed) {
-							c.drawText(x48.getString(R.string.show_menu), systemOptions_x, systemOptions_y, systemOptionsPaint);
-						}
-						
+
+                        if (systemOptionDisplayed)
+                            c.drawBitmap(menuIcon, lcd_menuicon_x, lcd_pos_y, null);
 					
 				} else {
 					//Log.i("x48", "null canvas !");
@@ -947,67 +956,47 @@ public class HPView extends SurfaceView implements SurfaceHolder.Callback, Runna
 			int code = -1;
 			int pointerID = 0;
 			systemOptionDisplayed = false;
-			if (multiTouch) {
-				if( actionCode == MotionEvent.ACTION_DOWN || actionCode == MotionEvent.ACTION_UP ||
-						actionCode == MotionEvent.ACTION_POINTER_DOWN || actionCode == MotionEvent.ACTION_POINTER_UP ) {
-					pointerID = (action & MotionEvent.ACTION_POINTER_INDEX_MASK) >> MotionEvent.ACTION_POINTER_INDEX_SHIFT;
-					x = Wrapper.MotionEvent_getX(event, pointerID);
-					y = Wrapper.MotionEvent_getY(event, pointerID);
-					pointerID = Wrapper.MotionEvent_getPointerId(event, pointerID) + 1;
-				} else {
-					return false;
-				}
-				
-				// *_DOWN : lookup by coordinates
-				// *_UP : lookup by pointer pressed
-				if( actionCode == MotionEvent.ACTION_DOWN || actionCode == MotionEvent.ACTION_POINTER_DOWN ) {
-		            for(int i=0;i<MAX_TOUCHES;i++) {
-		                if (x >= buttons_coords[i][0] && x < buttons_coords[i][2] && y >= buttons_coords[i][1] && y < buttons_coords[i][3])
-		                {
-		                    code = i;
-		                    break;
-		                }
-		            }
-	            } else {
-	            	for(int i=0;i<MAX_TOUCHES;i++) {
-	            		if(touches[i] == pointerID)
-	            			code = i;
-	            	}
-		            }	            
-	            if (code == -1 && actionCode == MotionEvent.ACTION_DOWN ) {
-	            	x48.openOptionsMenu();
-	            	return true;
-	            }
-	       
-				if (code > -1) {
-					key(code, actionCode == MotionEvent.ACTION_DOWN || actionCode == MotionEvent.ACTION_POINTER_DOWN, pointerID);
-					return true;
-				}
-			} else {
-				// old code used before the 1.29 version: 
-				x = event.getX();
-				y = event.getY();
-				
-				if (action != MotionEvent.ACTION_DOWN && action != MotionEvent.ACTION_UP)
-					return false;
-				
-	            for(int i=0;i<MAX_TOUCHES;i++) {
-	                if (x >= buttons_coords[i][0] && x < buttons_coords[i][2] && y >= buttons_coords[i][1] && y < buttons_coords[i][3])
-	                {
-	                    code = i;
-	                    break;
-	                }
-	            }
-	            if (code == -1 && action == MotionEvent.ACTION_DOWN && currentOrientation != Configuration.ORIENTATION_LANDSCAPE ) {
-	            	x48.openOptionsMenu();
-	            	return true;
-	            }
-	       
-				if (code > -1) {
-					key(code, action == MotionEvent.ACTION_DOWN);
-					return action == MotionEvent.ACTION_DOWN;
-				}
-			}
+            if( actionCode == MotionEvent.ACTION_DOWN || actionCode == MotionEvent.ACTION_UP ||
+                    actionCode == MotionEvent.ACTION_POINTER_DOWN || actionCode == MotionEvent.ACTION_POINTER_UP ) {
+                pointerID = (action & MotionEvent.ACTION_POINTER_INDEX_MASK) >> MotionEvent.ACTION_POINTER_INDEX_SHIFT;
+                x = event.getX(pointerID);
+                y = event.getY(pointerID);
+                pointerID = event.getPointerId(pointerID) + 1;
+            } else {
+                return false;
+            }
+
+            // *_DOWN : lookup by coordinates
+            // *_UP : lookup by pointer pressed
+            if( actionCode == MotionEvent.ACTION_DOWN || actionCode == MotionEvent.ACTION_POINTER_DOWN ) {
+                for(int i=0;i<MAX_TOUCHES;i++) {
+                    if (x >= buttons_coords[i][0] && x < buttons_coords[i][2] && y >= buttons_coords[i][1] && y < buttons_coords[i][3])
+                    {
+                        code = i;
+                        break;
+                    }
+                }
+            } else {
+                for(int i=0;i<MAX_TOUCHES;i++) {
+                    if(touches[i] == pointerID) {
+                        code = i;
+                        break;
+                    }
+                }
+            }
+            if (code == -1 && actionCode == MotionEvent.ACTION_DOWN ) {
+                if (x >= lcd_menuicon_x)
+                    x48.openOptionsMenu();
+                else
+                    x48.changeKeybLite();
+                return true;
+            }
+
+            if (code > -1) {
+                key(code, actionCode == MotionEvent.ACTION_DOWN || actionCode == MotionEvent.ACTION_POINTER_DOWN, pointerID);
+                return true;
+            }
+
 		}
 		
 		return false;
@@ -1041,16 +1030,6 @@ public class HPView extends SurfaceView implements SurfaceHolder.Callback, Runna
 		//Log.i("x48", "code: " + code + " / " + down);
 		if (code < MAX_TOUCHES) {
 			if (down) {
-				if (!multiTouch) {
-					for(int i=0;i<MAX_TOUCHES;i++) {
-						if (touches[i] != 0) {
-							Log.i("x48", "no multitouch !, force up of " + i);
-							queuedCodes.add(i + 100);
-							touches [i] = 0;
-							break;
-						}
-					}
-				}
 				Integer cI = code+1;
 				if (!queuedCodes.contains(cI)) {
 					queuedCodes.add(cI);
@@ -1068,37 +1047,15 @@ public class HPView extends SurfaceView implements SurfaceHolder.Callback, Runna
 					touches [code] = 0;
 				} else {
 					Log.i("x48", "rejected up");
-					if (!multiTouch) {
-						for(int i=0;i<MAX_TOUCHES;i++) {
-							if (touches[i] != 0) {
-								Log.i("x48", "forced up of " + i);
-								queuedCodes.add(i + 100);
-								touches [i] = 0;
-							}
-						}
-					}
 				}
 			}
 			x48.flipScreen();
-			this.notify();
+            unpauseEvent();
 		}
 	}
-	
-	
-	
-	public synchronized void pauseEvent() {
-		//Log.i("x48", "pauseEvent begin");
-		try {
-			this.wait();
-		} catch (InterruptedException e) {
-			//Log.i("x48", "pauseEvent: " + e.getMessage());
-		}
-		//Log.i("x48", "pauseEvent end");
-	}
-	
-	public synchronized void unpauseEvent() {
-		//Log.i("x48", "unpauseEvent");
-		this.notify();
+
+	public void unpauseEvent() {
+		x48.openConditionVariable();
 	}
 	
 	public synchronized int waitEvent() {
